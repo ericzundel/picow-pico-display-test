@@ -121,6 +121,7 @@ def do_button_y():
     paint_screen(0x00ffff)
     time.sleep(2)
 
+
 button_a = setup_button(board.GP12)
 button_b = setup_button(board.GP13)
 button_x = setup_button(board.GP14)
