@@ -2,17 +2,26 @@
 adapted from http://helloraspberrypi.blogspot.com/2021/01/raspberry-pi-picocircuitpython-st7789.html
 """
 
-import os
 import board
-import time
-import terminalio
-import displayio
 import busio
+import displayio
+from digitalio import DigitalInOut, Direction, Pull
+import os
+import socketpool
+import ssl
+import terminalio
+import time
+import wifi
 
+
+# 3rd party libraries
 from adafruit_display_text import label
 import adafruit_st7789
+import adafruit_requests
 
-from digitalio import DigitalInOut, Direction, Pull
+# Local modules
+from openweather import openweather
+from rgb import RGB
 
 print("==============================")
 print(os.uname())
@@ -39,6 +48,9 @@ display_bus = displayio.FourWire(spi, command=tft_dc, chip_select=tft_cs)
 display = adafruit_st7789.ST7789(display_bus,
                     width=135, height=240,
                     rowstart=40, colstart=53)
+
+weather = openweather()
+rgb_led = RGB()
 
 def paint_screen(bgcolor=0x0000ff):
     display.rotation = 180
@@ -95,6 +107,7 @@ def setup_button(pin):
     button.pull = Pull.UP
     return button
 
+
 def debounce(button):
     if not button.value:
         time.sleep(0.1)
@@ -102,23 +115,28 @@ def debounce(button):
     return False
 
 def do_button_a():
-    print("Button A Pressed")
+    print("Button A Pressed. Fetching Weather")
+    weather.fetch(requests)
     paint_screen(0xff0000)
+    rgb_led.set(0xff, 0, 0)
     time.sleep(2)
 
 def do_button_b():
     print("Button B Pressed")
     paint_screen(0x00ff00)
+    rgb_led.set(0, 0xff, 0)
     time.sleep(2)
 
 def do_button_x():
     print("Button X Pressed")
     paint_screen(0xff00ff)
+    rgb_led.set(0xff, 0, 0xff)
     time.sleep(2)
 
 def do_button_y():
     print("Button Y Pressed")
     paint_screen(0x00ffff)
+    rgb_led.set(0, 0xff, 0xff)
     time.sleep(2)
 
 button_a = setup_button(board.GP12)
@@ -126,11 +144,15 @@ button_b = setup_button(board.GP13)
 button_x = setup_button(board.GP14)
 button_y = setup_button(board.GP15)
 
+wifi.radio.connect(os.getenv('WIFI_SSID'), os.getenv('WIFI_PASSWORD'))
+pool = socketpool.SocketPool(wifi.radio)
+requests = adafruit_requests.Session(pool, ssl.create_default_context())
 
 paint_screen()
 
 # Main loop
 while True:
+    rgb_led.off()
     time.sleep(.1)
     # Check the buttons
     if (debounce(button_a)):
@@ -141,7 +163,5 @@ while True:
         do_button_x()
     elif (debounce(button_y)):
         do_button_y()
-
-
 
 
