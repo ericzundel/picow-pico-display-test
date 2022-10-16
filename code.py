@@ -23,21 +23,25 @@ import rgb
 
 # returns instance of adafruit_requests module
 def init_wifi(spi):
+    start = time.time()
     connected = False
     savedException = 0
 
-    print ("Initializing WiFi. Prepare for flakiness!")
-    for i in range(0,3):
+    print ("Prepare for flakiness!")
+    for i in range(0,10):
+        print("Initializing WiFi.")
         try:
             wifi.radio.connect(os.getenv('WIFI_SSID'), os.getenv('WIFI_PASSWORD'))
             connected = True
         except Exception as e:
             savedException = e
             print("Attempt: "+ str(i) +" Error Connecting: " + str(e))
-    print ("WiFi Ready.")
+            time.sleep(2)
+    print ("WiFi Ready. " + str(time.time() - start) + " seconds.")
 
     if connected is False:
-        raise savedException
+        print("Giving up and soft resetting.")
+        microcontroller.reset()
 
     pool = socketpool.SocketPool(wifi.radio)
     return adafruit_requests.Session(pool, ssl.create_default_context())
@@ -55,7 +59,7 @@ def debounce(button):
     return False
 
 def do_button_a():
-    global screen
+    global display
     global rgb_led
     print("Button A Pressed. Fetching Weather")
     display.paint_screen(0xff0000)
@@ -66,7 +70,7 @@ def do_button_a():
     time.sleep(2)
 
 def do_button_b():
-    global screen
+    global display
     global rgb_led
     print("Button B Pressed")
     display.paint_screen(0x00ff00)
@@ -74,7 +78,7 @@ def do_button_b():
     time.sleep(2)
 
 def do_button_x():
-    global screen
+    global display
     global rgb_led
     print("Button X Pressed")
     display.paint_screen(0xff00ff)
@@ -82,10 +86,10 @@ def do_button_x():
     time.sleep(2)
 
 def do_button_y():
-    global screen
+    global display
     global rgb_led
     print("Button Y Pressed")
-    screen.paint_screen(0x00ffff)
+    display.paint_screen(0x00ffff)
     rgb_led.set(0, 0xff, 0xff)
     time.sleep(2)
 
@@ -108,7 +112,7 @@ classbusio.SPI(clock: microcontroller.Pin,
 """
 spi = busio.SPI(spi_clk, MOSI=spi_mosi)
 print("SPI initialized")
-screen = picodisplay.screen(spi)
+display = picodisplay.screen(spi)
 weather = openweather()
 # rgb_led = rgb.RGB()
 # Disable the LED, it seems to interfere with the WiFi?
