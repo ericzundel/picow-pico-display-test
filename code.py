@@ -2,109 +2,45 @@
 adapted from http://helloraspberrypi.blogspot.com/2021/01/raspberry-pi-picocircuitpython-st7789.html
 """
 
+# System imports
 import board
 import busio
-import displayio
 from digitalio import DigitalInOut, Direction, Pull
+import displayio
 import os
 import socketpool
 import ssl
-import terminalio
 import time
 import wifi
 
-
-# 3rd party libraries
-from adafruit_display_text import label
-import adafruit_st7789
+# 3rd party imports
 import adafruit_requests
 
-# Local modules
+# Local module imports
+import picodisplay
 from openweather import openweather
 import rgb
 
-print("==============================")
-print(os.uname())
-print("Hello Raspberry Pi Pico/CircuitPython ST7789 SPI IPS Display")
-print(adafruit_st7789.__name__ + " version: " + adafruit_st7789.__version__)
-print()
+# returns instance of adafruit_requests module
+def init_wifi(spi):
+    connected = False
+    savedException = 0
 
-# Release any resources currently in use for the displays
-displayio.release_displays()
+    print ("Initializing WiFi. Prepare for flakiness!")
+    for i in range(0,3):
+        try:
+            wifi.radio.connect(os.getenv('WIFI_SSID'), os.getenv('WIFI_PASSWORD'))
+            connected = True
+        except Exception as e:
+            savedException = e
+            print("Attempt: "+ str(i) +" Error Connecting: " + str(e))
+    print ("WiFi Ready.")
 
-tft_cs = board.GP17
-tft_dc = board.GP16
-spi_mosi = board.GP19
-spi_clk = board.GP18
+    if connected is False:
+        raise savedException
 
-"""
-classbusio.SPI(clock: microcontroller.Pin,
-                MOSI: Optional[microcontroller.Pin] = None,
-                MISO: Optional[microcontroller.Pin] = None)
-"""
-spi = busio.SPI(spi_clk, MOSI=spi_mosi)
-
-display_bus = displayio.FourWire(spi, command=tft_dc, chip_select=tft_cs)
-display = adafruit_st7789.ST7789(display_bus,
-                    width=135, height=240,
-                    rowstart=40, colstart=53)
-
-weather = openweather()
-
-
-# rgb_led = rgb.RGB()
-# Disable the LED, it seems to interfere with the WiFi?
-rgb_led = rgb.FakeRGB()
-rgb_led.off()
-
-def paint_screen(bgcolor=0x0000ff):
-    display.rotation = 180
-    # Make the display context
-    splash = displayio.Group()
-    display.show(splash)
-
-    color_bitmap = displayio.Bitmap(135, 240, 1)
-    color_palette = displayio.Palette(1)
-    color_palette[0] = 0x00FF00
-
-    bg_sprite = displayio.TileGrid(color_bitmap,
-                                   pixel_shader=color_palette, x=0, y=0)
-    splash.append(bg_sprite)
-
-    # Draw a smaller inner rectangle
-    inner_bitmap = displayio.Bitmap(133, 238, 1)
-    inner_palette = displayio.Palette(1)
-    inner_palette[0] = bgcolor
-    inner_sprite = displayio.TileGrid(inner_bitmap,
-                                      pixel_shader=inner_palette, x=1, y=1)
-    splash.append(inner_sprite)
-
-    # Draw a label
-    text_group1 = displayio.Group(scale=1, x=20, y=40)
-    text1 = "wildestpixel"
-    text_area1 = label.Label(terminalio.FONT, text=text1, color=0xFF0000)
-    text_group1.append(text_area1)  # Subgroup for text scaling
-    # Draw a label
-    text_group2 = displayio.Group(scale=1, x=20, y=60)
-    text2 = "CircuitPython"
-    text_area2 = label.Label(terminalio.FONT, text=text2, color=0xFFFFFF)
-    text_group2.append(text_area2)  # Subgroup for text scaling
-
-    # Draw a label
-    text_group3 = displayio.Group(scale=1, x=20, y=100)
-    text3 = adafruit_st7789.__name__
-    text_area3 = label.Label(terminalio.FONT, text=text3, color=0x0000000)
-    text_group3.append(text_area3)  # Subgroup for text scaling
-    # Draw a label
-    text_group4 = displayio.Group(scale=2, x=20, y=120)
-    text4 = adafruit_st7789.__version__
-    text_area4 = label.Label(terminalio.FONT, text=text4, color=0x000000)
-    text_group4.append(text_area4)  # Subgroup for text scaling
-
-    splash.append(text_group1)
-    splash.append(text_group2)
-    splash.append(text_group3)
-    splash.append(text_group4)
+    pool = socketpool.SocketPool(wifi.radio)
+    return adafruit_requests.Session(pool, ssl.create_default_context())
 
 def setup_button(pin):
     button = DigitalInOut(pin)
@@ -119,8 +55,10 @@ def debounce(button):
     return False
 
 def do_button_a():
+    global screen
+    global rgb_led
     print("Button A Pressed. Fetching Weather")
-    paint_screen(0xff0000)
+    display.paint_screen(0xff0000)
     rgb_led.set(0xff, 0, 0)
     response = weather.fetch(requests)
     # For Debugging
@@ -128,47 +66,66 @@ def do_button_a():
     time.sleep(2)
 
 def do_button_b():
+    global screen
+    global rgb_led
     print("Button B Pressed")
-    paint_screen(0x00ff00)
+    display.paint_screen(0x00ff00)
     rgb_led.set(0, 0xff, 0)
     time.sleep(2)
 
 def do_button_x():
+    global screen
+    global rgb_led
     print("Button X Pressed")
-    paint_screen(0xff00ff)
+    display.paint_screen(0xff00ff)
     rgb_led.set(0xff, 0, 0xff)
     time.sleep(2)
 
 def do_button_y():
+    global screen
+    global rgb_led
     print("Button Y Pressed")
-    paint_screen(0x00ffff)
+    screen.paint_screen(0x00ffff)
     rgb_led.set(0, 0xff, 0xff)
     time.sleep(2)
+
+print("==============================")
+print("Initializing")
+print("uname: ", end=" ")
+print(os.uname())
+
+# Release any resources currently in use for the displays
+# Prevents error "ValueError: GP18 in use" when initializing SPI
+displayio.release_displays()
+
+spi_mosi = board.GP19
+spi_clk = board.GP18
+
+"""
+classbusio.SPI(clock: microcontroller.Pin,
+                MOSI: Optional[microcontroller.Pin] = None,
+                MISO: Optional[microcontroller.Pin] = None)
+"""
+spi = busio.SPI(spi_clk, MOSI=spi_mosi)
+print("SPI initialized")
+screen = picodisplay.screen(spi)
+weather = openweather()
+# rgb_led = rgb.RGB()
+# Disable the LED, it seems to interfere with the WiFi?
+rgb_led = rgb.FakeRGB()
+rgb_led.off()
+
+requests = init_wifi(spi)
 
 button_a = setup_button(board.GP12)
 button_b = setup_button(board.GP13)
 button_x = setup_button(board.GP14)
 button_y = setup_button(board.GP15)
 
-connected = False
-savedException = 0
+display.paint_screen()
 
-print ("Initializing WiFi. Prepare for flakiness!")
-for i in range(0,3):
-    try:
-        wifi.radio.connect(os.getenv('WIFI_SSID'), os.getenv('WIFI_PASSWORD'))
-        connected = True
-    except Exception as e:
-        savedException = e
-        print("Attempt: "+ str(i) +" Error Connecting: " + str(e))
-
-if connected is False:
-    raise savedException
-
-pool = socketpool.SocketPool(wifi.radio)
-requests = adafruit_requests.Session(pool, ssl.create_default_context())
-
-paint_screen()
+print("Initialization complete.")
+print("------------------------------")
 
 # Main loop
 while True:

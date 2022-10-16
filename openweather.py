@@ -1,19 +1,23 @@
-# Write your code here :-)
+# Communicate with the openweather API
+# Author: Eric Ayers <ericzundel@gmail.com>
 
 import time
 import os
 import ssl
 import microcontroller
+
+# 3rd party imports
 import adafruit_requests
 
 class openweather:
-    # location - Use cityname, country code where countrycode is ISO3166 format.
+    # openweather_token - value of the openweather token, see https://openweather.org
     def __init__(self,
       openweather_token=os.getenv('openweather_token'),
       **kwargs):
         self.openweather_token=openweather_token
         print ("Openweather token is " + self.openweather_token)
 
+    # requests - instance of the adafruit_requests module
     def fetch(self, requests):
         # openweathermap URL, brings in your location & your token
         #url = "http://api.openweathermap.org/data/3.0/weather?q="+self.location
@@ -37,6 +41,7 @@ class openweather:
         response_as_json['main']['converted_temp_c'] = (response_as_json['main']['temp'] - 273.15)
         return response_as_json
 
+    # Print the JSON data out for debugging
     def print(self, response_as_json):
         print()
         #  prints the entire JSON

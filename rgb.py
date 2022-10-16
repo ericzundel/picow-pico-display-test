@@ -1,4 +1,5 @@
 #  Control the RGB LED on the Pimoroni pico display using a Raspberry Pi Pico
+# Author: Eric Ayers <ericzundel@gmail.com>
 
 import board
 import pwmio
