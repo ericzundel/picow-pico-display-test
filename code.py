@@ -21,7 +21,7 @@ import adafruit_requests
 
 # Local modules
 from openweather import openweather
-from rgb import RGB
+import rgb
 
 print("==============================")
 print(os.uname())
@@ -50,7 +50,12 @@ display = adafruit_st7789.ST7789(display_bus,
                     rowstart=40, colstart=53)
 
 weather = openweather()
-rgb_led = RGB()
+
+
+# rgb_led = rgb.RGB()
+# Disable the LED, it seems to interfere with the WiFi?
+rgb_led = rgb.FakeRGB()
+rgb_led.off()
 
 def paint_screen(bgcolor=0x0000ff):
     display.rotation = 180
@@ -107,7 +112,6 @@ def setup_button(pin):
     button.pull = Pull.UP
     return button
 
-
 def debounce(button):
     if not button.value:
         time.sleep(0.1)
@@ -116,9 +120,11 @@ def debounce(button):
 
 def do_button_a():
     print("Button A Pressed. Fetching Weather")
-    weather.fetch(requests)
     paint_screen(0xff0000)
     rgb_led.set(0xff, 0, 0)
+    response = weather.fetch(requests)
+    # For Debugging
+    weather.print(response)
     time.sleep(2)
 
 def do_button_b():
@@ -144,7 +150,21 @@ button_b = setup_button(board.GP13)
 button_x = setup_button(board.GP14)
 button_y = setup_button(board.GP15)
 
-wifi.radio.connect(os.getenv('WIFI_SSID'), os.getenv('WIFI_PASSWORD'))
+connected = False
+savedException = 0
+
+print ("Initializing WiFi. Prepare for flakiness!")
+for i in range(0,3):
+    try:
+        wifi.radio.connect(os.getenv('WIFI_SSID'), os.getenv('WIFI_PASSWORD'))
+        connected = True
+    except Exception as e:
+        savedException = e
+        print("Attempt: "+ str(i) +" Error Connecting: " + str(e))
+
+if connected is False:
+    raise savedException
+
 pool = socketpool.SocketPool(wifi.radio)
 requests = adafruit_requests.Session(pool, ssl.create_default_context())
 
