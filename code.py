@@ -7,6 +7,7 @@ import board
 import busio
 from digitalio import DigitalInOut, Direction, Pull
 import displayio
+import microcontroller
 import os
 import socketpool
 import ssl
@@ -28,20 +29,26 @@ def init_wifi(spi):
     savedException = 0
 
     print ("Prepare for flakiness!")
-    for i in range(0,10):
+    for i in range(0,3):
         print("Initializing WiFi.")
         try:
-            wifi.radio.connect(os.getenv('WIFI_SSID'), os.getenv('WIFI_PASSWORD'))
+            # wifi.radio.connect(os.getenv('WIFI_SSID'), os.getenv('WIFI_PASSWORD'))
+            # A&O 2.4 GHz
+            # wifi.radio.connect(os.getenv('WIFI_SSID'), os.getenv('WIFI_PASSWORD'), bssid=bytes([0xF0,0x72,0xEA,0x7E,0xD0,0x12]))
+            # AT&T
+            wifi.radio.connect(os.getenv('WIFI_SSID'), os.getenv('WIFI_PASSWORD'), bssid=bytes([0x90,0x9D,0x7D,0x2b,0x8F,0x70]))
             connected = True
         except Exception as e:
             savedException = e
             print("Attempt: "+ str(i) +" Error Connecting: " + str(e))
             time.sleep(2)
-    print ("WiFi Ready. " + str(time.time() - start) + " seconds.")
+        break
 
     if connected is False:
         print("Giving up and soft resetting.")
         microcontroller.reset()
+
+    print ("WiFi Ready. " + str(time.time() - start) + " seconds.")
 
     pool = socketpool.SocketPool(wifi.radio)
     return adafruit_requests.Session(pool, ssl.create_default_context())
